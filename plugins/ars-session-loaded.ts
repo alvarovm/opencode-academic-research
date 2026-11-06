@@ -1,18 +1,20 @@
-import type { Plugin } from "@opencode-ai/plugin"
+import { Plugin } from "@opencode/plugin"
 import { readFileSync, existsSync } from "node:fs"
 import { resolve, dirname } from "node:path"
+import { fileURLToPath } from "node:url"
 
 /**
  * ars-session-loaded
  *
  * OpenCode plugin for the Academic Research Skills suite.
+ * Compatible with OpenCode v2 (and v1 via dual-export).
  *
  * Hooks:
- *   event (session.created)       — logs a startup notice confirming ARS is active
- *   tool.execute.before           — write-scope guard: enforces per-agent write
- *                                   boundaries from ars_phase_scope_manifest.json
- *   shell.env                     — injects ARS env vars into shell executions
- *   experimental.session.compacting — preserves ARS state across context compaction
+ *   event (session.created)         — logs a startup notice confirming ARS is active
+ *   tool.execute.before             — write-scope guard: enforces per-agent write
+ *                                     boundaries from ars_phase_scope_manifest.json
+ *   shell.create.before / shell.env — injects ARS env vars into shell executions
+ *   session.hook("compaction")      — preserves ARS state across context compaction
  *
  * The write guard is ADVISORY by default — it logs violations but does not
  * block writes. Set ARS_WRITE_GUARD=strict to throw and block out-of-scope writes.
@@ -55,10 +57,8 @@ function loadManifest(pluginDir: string, workDir: string): PhaseManifest | null 
   return null
 }
 
-/**
- * Match a file path against a glob pattern.
- * Supports: "phase1_*\/**", "phase7_*\/paper.md", "**\/*.yaml"
- */
+// Match a file path against a glob pattern.
+// Supports patterns like phase1_* or phase7_*.
 function matchGlob(filePath: string, glob: string): boolean {
   const normalized = filePath.replace(/\\/g, "/").replace(/^\.\//, "")
   const regexStr = glob
@@ -102,21 +102,12 @@ function countSkillAgents(workDir: string, skill: string): number {
   }
 }
 
-// --- Plugin ---
-
-export const ARSPlugin: Plugin = async ({ client, directory, worktree }) => {
-  const pluginDir = dirname(new URL(import.meta.url).pathname)
-  const workDir = worktree || directory
-  const manifest = loadManifest(pluginDir, workDir)
-  const isStrict = process.env.ARS_WRITE_GUARD === "strict"
-  const agentCount = countAgents(workDir)
-
-  // Build the startup message
+function buildStartupMessage(workDir: string, manifest: PhaseManifest | null, isStrict: boolean): string {
   const guardStatus = manifest
     ? `active${isStrict ? " [STRICT — will block out-of-scope writes]" : " [advisory]"}`
     : "manifest not found (guard disabled)"
 
-  const startupMessage = [
+  return [
     `Academic Research Skills (ARS) v3.13.0 loaded.`,
     ``,
     `Skills:`,
@@ -126,39 +117,65 @@ export const ARSPlugin: Plugin = async ({ client, directory, worktree }) => {
     `  academic-pipeline        10-stage orchestrator`,
     ``,
     `Commands: 16 (/ars-plan, /ars-full, /ars-lit-review, /ars-reviewer, ...)`,
-    `Agents: ${agentCount} unique *_agent.md files`,
+    `Agents: ${countAgents(workDir)} unique *_agent.md files`,
     `Write-scope guard: ${guardStatus}`,
   ].join("\n")
+}
 
-  return {
-    // --- Session event: announce ARS on session creation ---
-    event: async ({ event }) => {
-      if (event.type === "session.created") {
-        try {
-          await client.app.log({
-            body: {
-              service: "ars-session-loaded",
-              level: "info",
-              message: startupMessage,
-            },
-          })
-        } catch {
-          // Best-effort. Never break the session.
+const COMPACTION_PROMPT_STATE = `## ARS Pipeline State (preserved across compaction)
+
+This session uses the Academic Research Skills (ARS) v3.13.0 suite.
+
+Key context to preserve:
+- Active skill and mode (check the most recent /ars-* command invocation)
+- Current pipeline phase (if running /ars-full, note which stage: research/write/review/revise/finalize)
+- Material Passport path and any human-read acknowledgments
+- Citation keys that failed verification (need re-check or /ars-cache-invalidate)
+- Write-scope guard mode
+- Any cross-model verification results or integrity gate outcomes
+
+Available commands: /ars-plan, /ars-full, /ars-lit-review, /ars-reviewer,
+/ars-revision, /ars-revision-coach, /ars-abstract, /ars-outline,
+/ars-citation-check, /ars-format-convert, /ars-disclosure,
+/ars-mark-read, /ars-unmark-read, /ars-cache-invalidate, /ars-3w, /ars-rebuttal-audit
+
+Routing: if the user's intent spans multiple pipeline phases, clarify before routing.
+Do NOT auto-route ambiguous cross-phase materials to a single-phase agent.`
+
+// --- OpenCode V2 Plugin Definition ---
+
+const arsPluginV2 = Plugin.define({
+  id: "ars-session-loaded",
+  async setup(ctx) {
+    const pluginDir = dirname(fileURLToPath(import.meta.url))
+    const workDir = ctx.location.directory
+    const manifest = loadManifest(pluginDir, workDir)
+    const isStrict = process.env.ARS_WRITE_GUARD === "strict"
+    const startupMessage = buildStartupMessage(workDir, manifest, isStrict)
+
+    // 1. Session announcement: log notice when session is created
+    const controller = new AbortController()
+    void (async () => {
+      try {
+        for await (const event of ctx.event.subscribe({ signal: controller.signal })) {
+          if (event.type === "session.created") {
+            console.log(`[ars-session-loaded] ${startupMessage}`)
+          }
         }
+      } catch {
+        // Ignored on controller abort
       }
-    },
+    })()
 
-    // --- Write-scope guard: enforce phase boundaries on file writes ---
-    "tool.execute.before": async (input, output) => {
+    // 2. Write-scope guard: enforce phase boundaries on file writes
+    await ctx.tool.hook("execute.before", async (event) => {
       if (!manifest) return
 
-      // Only guard write-capable tools
       const writeTools = ["write", "edit", "multiedit", "apply_patch"]
-      const toolName = (input.tool ?? "").toLowerCase()
+      const toolName = (event.tool ?? "").toLowerCase()
       if (!writeTools.includes(toolName)) return
 
-      // Extract the target file path from tool args
-      const args = output.args as Record<string, unknown> | undefined
+      const args = event.input as Record<string, unknown> | undefined
       const filePath =
         (args?.filePath as string) ??
         (args?.file_path as string) ??
@@ -166,19 +183,12 @@ export const ARSPlugin: Plugin = async ({ client, directory, worktree }) => {
         ""
       if (!filePath) return
 
-      // Normalize to workspace-relative path
       const relative = filePath.startsWith(workDir)
         ? filePath.slice(workDir.length + 1)
         : filePath.replace(/^\.\//, "")
 
-      // Only guard writes to phase directories (phase1_*, phase2_*, etc.)
-      // Infrastructure files (scripts/, docs/, etc.) are always allowed.
       if (!/^phase\d/.test(relative)) return
 
-      // Check if the path matches ANY agent's allowed write globs.
-      // Since OpenCode's tool.execute.before doesn't expose the active
-      // subagent identity, we enforce the weaker invariant: all phase-dir
-      // writes must land in SOME agent's allowed scope.
       const inScope = Object.values(manifest.agents).some((entry) =>
         entry.allowed_write_globs.some((glob) => matchGlob(relative, glob)),
       )
@@ -189,23 +199,95 @@ export const ARSPlugin: Plugin = async ({ client, directory, worktree }) => {
           `agents' allowed_write_globs in ars_phase_scope_manifest.json`
 
         if (isStrict) {
-          // In strict mode, throw to BLOCK the write
-          await client.app.log({
-            body: { service: "ars-write-guard", level: "error", message: `BLOCKED: ${msg}` },
-          }).catch(() => {})
+          console.error(`[ars-write-guard] BLOCKED: ${msg}`)
           throw new Error(msg)
         }
 
-        // Advisory mode: log warning but allow the write
-        await client.app.log({
-          body: { service: "ars-write-guard", level: "warn", message: `WARNING: ${msg}` },
-        }).catch(() => {})
+        console.warn(`[ars-write-guard] WARNING: ${msg}`)
+      }
+    })
+
+    // 3. Shell env: inject ARS environment variables
+    await ctx.shell.hook("create.before", (event) => {
+      if (!event.env.ARS_MANIFEST_PATH && manifest) {
+        const manifestPath = resolve(workDir, "scripts", "ars_phase_scope_manifest.json")
+        if (existsSync(manifestPath)) {
+          event.env.ARS_MANIFEST_PATH = manifestPath
+        }
+      }
+      if (isStrict && !event.env.ARS_WRITE_GUARD) {
+        event.env.ARS_WRITE_GUARD = "strict"
+      }
+    })
+
+    // 4. Compaction context preservation
+    await ctx.session.hook("compaction", (event) => {
+      event.system.push({
+        type: "text",
+        text: COMPACTION_PROMPT_STATE,
+      })
+    })
+
+    return () => {
+      controller.abort()
+    }
+  },
+})
+
+// --- Legacy OpenCode V1 Handler (for backwards compatibility) ---
+
+export const ARSPlugin = async ({ client, directory, worktree }: any) => {
+  const pluginDir = dirname(fileURLToPath(import.meta.url))
+  const workDir = worktree || directory || process.cwd()
+  const manifest = loadManifest(pluginDir, workDir)
+  const isStrict = process.env.ARS_WRITE_GUARD === "strict"
+  const startupMessage = buildStartupMessage(workDir, manifest, isStrict)
+
+  return {
+    event: async ({ event }: any) => {
+      if (event.type === "session.created") {
+        try {
+          await client?.app?.log({
+            body: {
+              service: "ars-session-loaded",
+              level: "info",
+              message: startupMessage,
+            },
+          })
+        } catch {
+          // Best effort
+        }
       }
     },
-
-    // --- Shell env: inject ARS environment variables ---
-    "shell.env": async (_input, output) => {
-      // Ensure ARS Python scripts can find the manifest and cache
+    "tool.execute.before": async (input: any, output: any) => {
+      if (!manifest) return
+      const writeTools = ["write", "edit", "multiedit", "apply_patch"]
+      const toolName = (input.tool ?? "").toLowerCase()
+      if (!writeTools.includes(toolName)) return
+      const args = output?.args as Record<string, unknown> | undefined
+      const filePath =
+        (args?.filePath as string) ??
+        (args?.file_path as string) ??
+        (args?.path as string) ??
+        ""
+      if (!filePath) return
+      const relative = filePath.startsWith(workDir)
+        ? filePath.slice(workDir.length + 1)
+        : filePath.replace(/^\.\//, "")
+      if (!/^phase\d/.test(relative)) return
+      const inScope = Object.values(manifest.agents).some((entry) =>
+        entry.allowed_write_globs.some((glob) => matchGlob(relative, glob)),
+      )
+      if (!inScope) {
+        const msg =
+          `[ARS write-guard] write to "${relative}" is outside all ` +
+          `agents' allowed_write_globs in ars_phase_scope_manifest.json`
+        if (isStrict) {
+          throw new Error(msg)
+        }
+      }
+    },
+    "shell.env": async (_input: any, output: any) => {
       const env = output.env as Record<string, string>
       if (!env.ARS_MANIFEST_PATH && manifest) {
         const manifestPath = resolve(workDir, "scripts", "ars_phase_scope_manifest.json")
@@ -213,34 +295,20 @@ export const ARSPlugin: Plugin = async ({ client, directory, worktree }) => {
           env.ARS_MANIFEST_PATH = manifestPath
         }
       }
-      // Propagate strict guard mode to child processes
       if (isStrict && !env.ARS_WRITE_GUARD) {
         env.ARS_WRITE_GUARD = "strict"
       }
     },
-
-    // --- Compaction: preserve ARS pipeline state across context resets ---
-    "experimental.session.compacting": async (_input, output) => {
+    "experimental.session.compacting": async (_input: any, output: any) => {
       const context = output.context as string[]
-      context.push(`## ARS Pipeline State (preserved across compaction)
-
-This session uses the Academic Research Skills (ARS) v3.13.0 suite.
-
-Key context to preserve:
-- Active skill and mode (check the most recent /ars-* command invocation)
-- Current pipeline phase (if running /ars-full, note which stage: research/write/review/revise/finalize)
-- Material Passport path and any human-read acknowledgments
-- Citation keys that failed verification (need re-check or /ars-cache-invalidate)
-- Write-scope guard mode: ${isStrict ? "STRICT (blocks out-of-scope writes)" : "advisory (logs only)"}
-- Any cross-model verification results or integrity gate outcomes
-
-Available commands: /ars-plan, /ars-full, /ars-lit-review, /ars-reviewer,
-/ars-revision, /ars-revision-coach, /ars-abstract, /ars-outline,
-/ars-citation-check, /ars-format-convert, /ars-disclosure,
-/ars-mark-read, /ars-unmark-read, /ars-cache-invalidate, /ars-3w, /ars-rebuttal-audit
-
-Routing: if the user's intent spans multiple pipeline phases, clarify before routing.
-Do NOT auto-route ambiguous cross-phase materials to a single-phase agent.`)
+      context.push(COMPACTION_PROMPT_STATE)
     },
   }
+}
+
+export default {
+  ...arsPluginV2,
+  async server(v1Context: any) {
+    return ARSPlugin(v1Context)
+  },
 }

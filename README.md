@@ -11,13 +11,13 @@ A suite of [OpenCode](https://opencode.ai) skills, slash commands, and a plugin 
 
 This repo is the OpenCode port of [`timpara/academic-research-skills`](https://github.com/timpara/academic-research-skills), itself a fork of the original Claude Code plugin by **Cheng-I Wu** ([Imbad0202/academic-research-skills](https://github.com/Imbad0202/academic-research-skills)). All workflow content, agent prompts, and Python verification scripts come from upstream. This port replaces the Claude Code plugin packaging with OpenCode's file-based skill / command / plugin discovery.
 
-**Install in under a minute** (OpenCode 0.x or later):
+**Install in under a minute** (OpenCode 1.x or 2.x):
 
 ```bash
 git clone https://github.com/timpara/opencode-academic-research.git
 cd opencode-academic-research
 ./install.sh   # symlinks skills/, commands/, plugins/ into ~/.config/opencode/
-bun install    # installs @opencode-ai/plugin for the session-loaded plugin
+bun install    # installs @opencode/plugin for the session-loaded plugin
 uv sync --extra dev  # installs Python deps for the verification scripts
 ```
 
@@ -273,13 +273,16 @@ You: "status"
 
 ---
 
-## Port notes
+## Port notes & OpenCode v2 compatibility
 
 This repo differs from upstream in packaging only:
 
-- **Skills** live under `skills/<name>/SKILL.md` (real directories, not symlinks). OpenCode discovers them by frontmatter.
-- **Slash commands** under `commands/ars-*.md` use `agent: build` and `compatibility: opencode` frontmatter instead of `model: sonnet|opus`. Model choice is per-session in OpenCode.
-- **Session-start hook** (upstream `hooks/hooks.json` + `scripts/announce-ars-loaded.sh`) is replaced by `plugins/ars-session-loaded.ts`, a TypeScript plugin built on `@opencode-ai/plugin`.
+- **OpenCode v2 native support**: fully compatible with OpenCode 2.x and backwards-compatible with OpenCode 1.x.
+- **Skills** live under `skills/<name>/SKILL.md` (real directories, not symlinks). OpenCode discovers them automatically via `.opencode/skills/` or `~/.config/opencode/skills/`.
+- **Slash commands** under `commands/ars-*.md` use `compatibility: opencode` and native `subagent: true` background delegation for subagents.
+- **Subagents** under `.opencode/agents/*.md` use native OpenCode v2 `permissions` arrays and `mode: subagent`.
+- **TypeScript plugin** (`plugins/ars-session-loaded.ts`) is built on the OpenCode v2 Plugin API (`@opencode/plugin` with `Plugin.define`, `ctx.tool`, `ctx.shell`, and `ctx.session.hook`), while providing a dual-export fallback for legacy v1 runtimes.
+- **Project config** (`opencode.json`) uses native V2 `permissions` arrays, `compaction.buffer`, and `shell` actions.
 - **Python scripts** keep their upstream content. The port adds `pyproject.toml` so you can install with `uv sync --extra dev` instead of `pip install -r requirements-dev.txt`.
 - **`.claude-plugin/` and `.claude/`** directories are removed. Project rules from upstream `.claude/CLAUDE.md` live in [`AGENTS.md`](AGENTS.md) at the repo root.
 

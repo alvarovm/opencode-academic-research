@@ -17,7 +17,7 @@
 git clone https://github.com/timpara/opencode-academic-research.git
 cd opencode-academic-research
 ./install.sh   # skills/、commands/、plugins/ を ~/.config/opencode/ に symlink
-bun install    # @opencode-ai/plugin をインストール（session-loaded plugin が使用）
+bun install    # @opencode/plugin をインストール（session-loaded plugin が使用）
 uv sync --extra dev  # Python 検証スクリプトの依存関係をインストール
 ```
 

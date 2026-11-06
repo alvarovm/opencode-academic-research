@@ -50,7 +50,7 @@ OpenCode does not support per-command model pinning the way Claude Code did. The
 
 ### Plugin discovery
 
-Plugins are TypeScript files under `plugins/` exporting a `Plugin` from `@opencode-ai/plugin`. OpenCode loads them at startup and registers their hook handlers.
+Plugins are TypeScript files under `plugins/` (or `.opencode/plugins/`) exporting a `Plugin` from `@opencode/plugin`. OpenCode loads them at startup and registers their hook handlers.
 
 ---
 
@@ -58,20 +58,22 @@ Plugins are TypeScript files under `plugins/` exporting a `Plugin` from `@openco
 
 ### Hook surface
 
-`@opencode-ai/plugin` exposes hooks including:
+`@opencode/plugin` exposes domain hooks and event subscriptions including:
 
-- `session.created` — fires when a new session starts.
-- `chat.message` — fires for each new user message.
-- `chat.params` — fires before sending the prompt to the model.
-- `tool.execute.before` / `tool.execute.after` — fire around tool calls.
+- `ctx.event.subscribe()` — async iterable stream of server events (e.g. `session.created`).
+- `ctx.tool.hook("execute.before")` / `ctx.tool.hook("execute.after")` — fire around tool executions.
+- `ctx.shell.hook("create.before")` — fires before shell execution to inject environment variables or adjust timeouts.
+- `ctx.session.hook("compaction")` — fires when context compaction summarizes conversation state.
 
 The port's `plugins/ars-session-loaded.ts` uses:
-- `session.created` — startup announce (parity with the upstream Claude Code `SessionStart` hook).
-- `tool.execute.before` — write-scope guard (port of the upstream `hooks/run_guard.sh` + `scripts/ars_write_scope_guard.py` PreToolUse hook).
+- `ctx.event.subscribe()` — startup announce (parity with the upstream Claude Code `SessionStart` hook).
+- `ctx.tool.hook("execute.before")` — write-scope guard (port of the upstream `hooks/run_guard.sh` + `scripts/ars_write_scope_guard.py` PreToolUse hook).
+- `ctx.shell.hook("create.before")` — injects `ARS_MANIFEST_PATH` and strict mode into child shells.
+- `ctx.session.hook("compaction")` — preserves ARS pipeline instructions across context summaries.
 
 ### Runtime requirements
 
-The plugin needs the `@opencode-ai/plugin` package installed at runtime. The repo's `package.json` declares it as a dev dependency; running `bun install` in the repo fetches it. If `bun install` is skipped, OpenCode loads the plugin file, the import fails, and the plugin silently does not run — there is no visible error.
+The plugin needs the `@opencode/plugin` package installed at runtime. The repo's `package.json` declares it as a dev dependency; running `bun install` in the repo fetches it. If `bun install` is skipped, OpenCode loads the plugin file, the import fails, and the plugin silently does not run — there is no visible error.
 
 ### Why a plugin and not a system prompt
 
@@ -83,29 +85,25 @@ OpenCode does **not** need this. The model sees commands and skills via OpenCode
 
 ## 3. Permission rules
 
-`opencode.json` at the repo root declares permission rules so OpenCode knows which commands the user has pre-approved for ARS:
+`opencode.json` at the repo root declares native OpenCode v2 permission rules so OpenCode knows which commands the user has pre-approved for ARS:
 
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
   "instructions": ["AGENTS.md"],
-  "permission": {
-    "bash": {
-      "uv *": "allow",
-      "uv run *": "allow",
-      "pytest *": "allow",
-      "ruff *": "allow",
-      "python scripts/*": "allow",
-      "git status": "allow",
-      "git diff*": "allow",
-      "git log*": "allow",
-      "ls *": "allow",
-      "cat *": "allow",
-      "*": "ask"
-    },
-    "edit": "allow",
-    "write": "allow"
-  }
+  "permissions": [
+    { "action": "read", "resource": "*", "effect": "allow" },
+    { "action": "edit", "resource": "*", "effect": "allow" },
+    { "action": "shell", "resource": "*", "effect": "ask" },
+    { "action": "shell", "resource": "uv *", "effect": "allow" },
+    { "action": "shell", "resource": "uv run *", "effect": "allow" },
+    { "action": "shell", "resource": "pytest *", "effect": "allow" },
+    { "action": "shell", "resource": "ruff *", "effect": "allow" },
+    { "action": "shell", "resource": "python3 scripts/*", "effect": "allow" },
+    { "action": "shell", "resource": "git status*", "effect": "allow" },
+    { "action": "shell", "resource": "git diff*", "effect": "allow" },
+    { "action": "shell", "resource": "git log*", "effect": "allow" }
+  ]
 }
 ```
 

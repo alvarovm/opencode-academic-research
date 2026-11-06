@@ -1,7 +1,7 @@
 ---
 description: ARS academic-paper `disclosure` mode — venue-specific AI-usage statement
 agent: ars-writer
-subtask: true
+subagent: true
 compatibility: opencode
 ---
 

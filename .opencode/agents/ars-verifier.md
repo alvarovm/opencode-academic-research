@@ -1,14 +1,22 @@
 ---
 description: "Citation verification subagent: verify citations against Semantic Scholar, OpenAlex, Crossref, arXiv. Use for running citation checks, cache operations, and integrity gates."
 mode: subagent
-temperature: 0.0
-permission:
-  edit: deny
-  bash:
-    "uv run python3 scripts/*": allow
-    "python3 scripts/*": allow
-    "*": deny
-  webfetch: allow
+permissions:
+  - action: edit
+    resource: "*"
+    effect: deny
+  - action: webfetch
+    resource: "*"
+    effect: allow
+  - action: shell
+    resource: "*"
+    effect: deny
+  - action: shell
+    resource: "uv run python3 scripts/*"
+    effect: allow
+  - action: shell
+    resource: "python3 scripts/*"
+    effect: allow
 ---
 
 You are the ARS citation-verification subagent. Your role is citation integrity checking.

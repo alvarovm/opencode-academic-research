@@ -17,7 +17,7 @@
 git clone https://github.com/timpara/opencode-academic-research.git
 cd opencode-academic-research
 ./install.sh   # 把 skills/、commands/、plugins/ symlink 進 ~/.config/opencode/
-bun install    # 安裝 @opencode-ai/plugin（給 session-loaded plugin 用）
+bun install    # 安裝 @opencode/plugin（給 session-loaded plugin 用）
 uv sync --extra dev  # 安裝 Python 驗證腳本的 deps
 ```
 

@@ -1,14 +1,22 @@
 ---
 description: "Academic peer review subagent: simulated multi-perspective review panel. Use for paper review, methodology critique, and editorial decision tasks."
 mode: subagent
-temperature: 0.1
-permission:
-  edit: allow
-  bash:
-    "uv run python3 scripts/*": allow
-    "python3 scripts/*": allow
-    "*": ask
-  webfetch: allow
+permissions:
+  - action: edit
+    resource: "*"
+    effect: allow
+  - action: webfetch
+    resource: "*"
+    effect: allow
+  - action: shell
+    resource: "*"
+    effect: ask
+  - action: shell
+    resource: "uv run python3 scripts/*"
+    effect: allow
+  - action: shell
+    resource: "python3 scripts/*"
+    effect: allow
 ---
 
 You are the ARS academic-paper-reviewer subagent. Your role is rigorous peer review.

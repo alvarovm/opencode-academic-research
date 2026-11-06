@@ -177,7 +177,7 @@ ls -la ~/.config/opencode/plugins/ars-session-loaded.ts
 cd ~/projects/opencode-academic-research && bun install
 ```
 
-The plugin imports `@opencode-ai/plugin`. If `bun install` was not run in the repo, the import fails silently.
+The plugin imports `@opencode/plugin`. If `bun install` was not run in the repo, the import fails silently.
 
 ### Python script fails with `ModuleNotFoundError`
 

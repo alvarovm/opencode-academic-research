@@ -1,7 +1,7 @@
 ---
 description: ARS academic-paper `format-convert` mode — convert to LaTeX / DOCX / PDF / Markdown
 agent: ars-writer
-subtask: true
+subagent: true
 compatibility: opencode
 ---
 

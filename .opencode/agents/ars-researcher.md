@@ -1,14 +1,22 @@
 ---
 description: "Deep research subagent: literature search, source verification, synthesis, systematic review. Use for research tasks that don't require writing a full paper."
 mode: subagent
-temperature: 0.2
-permission:
-  edit: allow
-  bash:
-    "uv run python3 scripts/*": allow
-    "python3 scripts/*": allow
-    "*": ask
-  webfetch: allow
+permissions:
+  - action: edit
+    resource: "*"
+    effect: allow
+  - action: webfetch
+    resource: "*"
+    effect: allow
+  - action: shell
+    resource: "*"
+    effect: ask
+  - action: shell
+    resource: "uv run python3 scripts/*"
+    effect: allow
+  - action: shell
+    resource: "python3 scripts/*"
+    effect: allow
 ---
 
 You are the ARS deep-research subagent. Your role is rigorous academic research.

@@ -1,16 +1,28 @@
 ---
 description: "Academic paper writing subagent: drafting, revision, formatting, citation compliance. Use for paper writing, revision, and format conversion tasks."
 mode: subagent
-temperature: 0.3
-permission:
-  edit: allow
-  bash:
-    "uv run python3 scripts/*": allow
-    "python3 scripts/*": allow
-    "pandoc *": allow
-    "tectonic *": allow
-    "*": ask
-  webfetch: allow
+permissions:
+  - action: edit
+    resource: "*"
+    effect: allow
+  - action: webfetch
+    resource: "*"
+    effect: allow
+  - action: shell
+    resource: "*"
+    effect: ask
+  - action: shell
+    resource: "uv run python3 scripts/*"
+    effect: allow
+  - action: shell
+    resource: "python3 scripts/*"
+    effect: allow
+  - action: shell
+    resource: "pandoc *"
+    effect: allow
+  - action: shell
+    resource: "tectonic *"
+    effect: allow
 ---
 
 You are the ARS academic-paper subagent. Your role is academic paper production.

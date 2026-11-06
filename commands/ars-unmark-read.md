@@ -1,7 +1,7 @@
 ---
 description: ARS /ars-unmark-read — rescind a prior human-read mark for one or more citation keys
 agent: ars-verifier
-subtask: true
+subagent: true
 compatibility: opencode
 ---
 

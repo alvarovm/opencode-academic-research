@@ -21,20 +21,20 @@ Commands route to specialized subagents to keep context focused:
 
 | Agent | Role | Commands routed here |
 |---|---|---|
-| `ars-researcher` | Literature search, synthesis, systematic review | `/ars-lit-review`, `/ars-3w` (subtask) |
-| `ars-writer` | Paper drafting, revision, format conversion | `/ars-disclosure` (subtask), `/ars-format-convert` (subtask) |
+| `ars-researcher` | Literature search, synthesis, systematic review | `/ars-lit-review`, `/ars-3w` (subagent) |
+| `ars-writer` | Paper drafting, revision, format conversion | `/ars-disclosure` (subagent), `/ars-format-convert` (subagent) |
 | `ars-reviewer` | Peer review simulation | `/ars-reviewer` |
-| `ars-verifier` | Citation checks, cache ops, mark-read signals | `/ars-citation-check`, `/ars-cache-invalidate`, `/ars-mark-read`, `/ars-unmark-read` (all subtask) |
+| `ars-verifier` | Citation checks, cache ops, mark-read signals | `/ars-citation-check`, `/ars-cache-invalidate`, `/ars-mark-read`, `/ars-unmark-read` (all subagent) |
 | `build` (default) | Full pipeline, planning, revision coaching | `/ars-full`, `/ars-plan`, `/ars-revision`, `/ars-revision-coach`, `/ars-abstract`, `/ars-outline`, `/ars-rebuttal-audit` |
 
-Commands marked "subtask" run in a child session and return results without polluting the primary context.
+Commands marked "subagent" (`subagent: true`) run in a child session and return results without polluting the primary context.
 
 ## Working in this repo
 
 - **Python**: use `uv` for everything. `uv run pytest scripts/` for tests, `uv run ruff check scripts/` for lint.
 - **Skill edits**: every change to a `skills/*/SKILL.md` file must preserve the YAML frontmatter (`name`, `description`, `metadata.version`) — they drive auto-discovery.
-- **Command edits**: every file in `commands/` must keep `description` and `compatibility: opencode` in frontmatter. Route to the appropriate `agent` (`build`, `ars-researcher`, `ars-writer`, `ars-reviewer`, or `ars-verifier`). Add `subtask: true` for lightweight commands.
-- **Plugin edits**: `plugins/*.ts` files import from `@opencode-ai/plugin`. Run `bun install` in `.opencode/` or the repo root after pulling.
+- **Command edits**: every file in `commands/` must keep `description` and `compatibility: opencode` in frontmatter. Route to the appropriate `agent` (`build`, `ars-researcher`, `ars-writer`, `ars-reviewer`, or `ars-verifier`). Add `subagent: true` for lightweight commands.
+- **Plugin edits**: `plugins/*.ts` files import from `@opencode/plugin`. Run `bun install` in `.opencode/` or the repo root after pulling.
 - **Subagent edits**: `.opencode/agents/*.md` files define subagent behavior. Keep `mode: subagent` and appropriate permissions.
 - **Docs edits**: when you change anything users read (README, SETUP, QUICKSTART), the change must work with OpenCode invocation paths. Do not reintroduce Claude Code `/plugin marketplace add` examples.
 

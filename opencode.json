@@ -3,47 +3,41 @@
   "instructions": ["AGENTS.md"],
   "compaction": {
     "auto": true,
-    "prune": false,
-    "reserved": 12000
+    "buffer": 12000
   },
-  "permission": {
-    "read": "allow",
-    "glob": "allow",
-    "grep": "allow",
-    "list": "allow",
-    "edit": "allow",
-    "skill": "allow",
-    "webfetch": "allow",
-    "todowrite": "allow",
-    "bash": {
-      "uv *": "allow",
-      "uv run *": "allow",
-      "python3 scripts/*": "allow",
-      "python scripts/*": "allow",
-      "pytest *": "allow",
-      "ruff *": "allow",
-      "git status*": "allow",
-      "git diff*": "allow",
-      "git log*": "allow",
-      "git show*": "allow",
-      "ls *": "allow",
-      "find *_agent.md*": "allow",
-      "bun *": "allow",
-      "pandoc *": "ask",
-      "tectonic *": "ask",
-      "*": "ask"
-    }
-  },
-  "agent": {
+  "permissions": [
+    { "action": "read", "resource": "*", "effect": "allow" },
+    { "action": "glob", "resource": "*", "effect": "allow" },
+    { "action": "grep", "resource": "*", "effect": "allow" },
+    { "action": "list", "resource": "*", "effect": "allow" },
+    { "action": "edit", "resource": "*", "effect": "allow" },
+    { "action": "skill", "resource": "*", "effect": "allow" },
+    { "action": "webfetch", "resource": "*", "effect": "allow" },
+    { "action": "shell", "resource": "*", "effect": "ask" },
+    { "action": "shell", "resource": "uv *", "effect": "allow" },
+    { "action": "shell", "resource": "uv run *", "effect": "allow" },
+    { "action": "shell", "resource": "python3 scripts/*", "effect": "allow" },
+    { "action": "shell", "resource": "python scripts/*", "effect": "allow" },
+    { "action": "shell", "resource": "pytest *", "effect": "allow" },
+    { "action": "shell", "resource": "ruff *", "effect": "allow" },
+    { "action": "shell", "resource": "git status*", "effect": "allow" },
+    { "action": "shell", "resource": "git diff*", "effect": "allow" },
+    { "action": "shell", "resource": "git log*", "effect": "allow" },
+    { "action": "shell", "resource": "git show*", "effect": "allow" },
+    { "action": "shell", "resource": "ls *", "effect": "allow" },
+    { "action": "shell", "resource": "find *_agent.md*", "effect": "allow" },
+    { "action": "shell", "resource": "bun *", "effect": "allow" },
+    { "action": "shell", "resource": "pandoc *", "effect": "ask" },
+    { "action": "shell", "resource": "tectonic *", "effect": "ask" }
+  ],
+  "agents": {
     "build": {
-      "permission": {
-        "bash": {
-          "uv run python3 scripts/*": "allow",
-          "uv run pytest*": "allow",
-          "uv run ruff*": "allow",
-          "*": "ask"
-        }
-      }
+      "permissions": [
+        { "action": "shell", "resource": "*", "effect": "ask" },
+        { "action": "shell", "resource": "uv run python3 scripts/*", "effect": "allow" },
+        { "action": "shell", "resource": "uv run pytest*", "effect": "allow" },
+        { "action": "shell", "resource": "uv run ruff*", "effect": "allow" }
+      ]
     }
   }
 }
