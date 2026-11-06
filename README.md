@@ -75,7 +75,7 @@ bun install
 uv sync --extra dev
 ```
 
-`install.sh` creates symlinks from `~/.config/opencode/{skills,commands,plugins}/` into this repo so OpenCode auto-discovers them. Edit files here and changes show up in the next OpenCode session.
+`install.sh` creates symlinks from `~/.config/opencode/{skills,commands,agents,plugins}/` into this repo (or pass `--local [DIR]` to scope to a specific project's `.opencode/` folder) so OpenCode auto-discovers them. Edit files here and changes show up in the next OpenCode session.
 
 **Verify it works:** open OpenCode and run `/ars-plan`, then describe a paper you are working on. ARS will start a Socratic dialogue to map out chapter structure. For a single-shot test instead, try `/ars-lit-review "your topic"`.
 
